@@ -133,8 +133,10 @@ async function loadDoctors() {
     const doctorId = urlParams.get('doctor');
     if (doctorId) {
       const doc = allDoctors.find(d => d.id == doctorId);
-      if (doc) {
+      if (doc && doc.is_available) {
         selectDoctor(doc);
+      } else if (doc) {
+        showToast("This doctor isn't currently accepting appointments.", 'error');
       }
     }
   } catch {
@@ -183,12 +185,19 @@ function renderDoctors(docs) {
             ${d.is_available ? '<span class="badge badge--completed" style="font-size:10.5px;">Available</span>' : '<span class="badge badge--cancelled" style="font-size:10.5px;">Unavailable</span>'}
           </div>
         </div>
-        <button class="btn btn--primary btn--sm" style="align-self:flex-end;margin-top:auto;" data-book="${d.id}">Book</button>
+        <button class="btn btn--primary btn--sm" style="align-self:flex-end;margin-top:auto;" data-book="${d.id}" ${d.is_available ? '' : 'disabled title="Not accepting appointments right now"'}>Book</button>
       </div>`;
   }).join('');
 
   grid.querySelectorAll('[data-book]').forEach(btn => {
-    btn.addEventListener('click', () => selectDoctor(docs.find(d => d.id == btn.dataset.book)));
+    btn.addEventListener('click', () => {
+      const doc = docs.find(d => d.id == btn.dataset.book);
+      if (doc && !doc.is_available) {
+        showToast("This doctor isn't currently accepting appointments.", 'error');
+        return;
+      }
+      selectDoctor(doc);
+    });
   });
 }
 
@@ -248,36 +257,47 @@ function renderBookingForm(doc) {
           <textarea id="apptNotes" rows="3" placeholder="Describe your symptoms or reason for visit…" style="resize:vertical;"></textarea>
         </div>
         <div id="bookFormError" class="form-error"></div>
-        <button class="btn btn--primary btn--sm" id="confirmBookBtn" style="margin-top:4px;">
-          ${icon('calendar')} Confirm Appointment
+        <button class="btn btn--primary btn--sm" id="confirmBookBtn" style="margin-top:4px;" disabled>
+          ${icon('calendar')} Select a time slot first
         </button>
       </div>
       <div>
         <div style="font-size:13px;font-weight:700;color:var(--forest-deep);margin-bottom:12px;">Available Slots</div>
-        <div id="slotsContainer">
-          ${availableSlots.length ? renderSlots(availableSlots) : `<div style="color:var(--ink-soft);font-size:13px;">No availability set by this doctor yet.</div>`}
-        </div>
+        <div id="slotsContainer"></div>
       </div>
     </div>
   `;
 
+  document.getElementById('apptDate').addEventListener('change', () => renderSlotsForSelectedDate());
   document.getElementById('confirmBookBtn').addEventListener('click', confirmBooking);
+  renderSlotsForSelectedDate();
 }
 
-function renderSlots(slots) {
-  const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-  const grouped = {};
-  slots.forEach(s => { (grouped[s.day] = grouped[s.day] || []).push(s); });
-  return days.filter(d => grouped[d]).map(day => `
-    <div style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;text-transform:capitalize;color:var(--ink-soft);margin-bottom:6px;">${day}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${(grouped[day] || []).map(s => `
-          <button class="slot-btn" data-slot='${JSON.stringify(s)}'>
-            ${formatTime(s.start_time)} – ${formatTime(s.end_time)}
-          </button>`).join('')}
-      </div>
-    </div>`).join('');
+function renderSlotsForSelectedDate() {
+  const container = document.getElementById('slotsContainer');
+  const confirmBtn = document.getElementById('confirmBookBtn');
+  const dateVal = document.getElementById('apptDate')?.value;
+  selectedSlot = null;
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = `${icon('calendar')} Select a time slot first`;
+
+  if (!dateVal) { container.innerHTML = ''; return; }
+
+  const weekday = new Date(dateVal + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const daySlots = availableSlots.filter(s => s.day === weekday);
+
+  if (!daySlots.length) {
+    container.innerHTML = `<div style="color:var(--ink-soft);font-size:13px;">This doctor has no availability on ${escapeHtml(weekday)}s. Try another date.</div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      ${daySlots.map(s => `
+        <button type="button" class="slot-btn" data-slot='${JSON.stringify(s)}'>
+          ${formatTime(s.start_time)} – ${formatTime(s.end_time)}
+        </button>`).join('')}
+    </div>`;
 }
 
 document.addEventListener('click', e => {
@@ -286,6 +306,11 @@ document.addEventListener('click', e => {
   document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('is-selected'));
   btn.classList.add('is-selected');
   selectedSlot = JSON.parse(btn.dataset.slot);
+  const confirmBtn = document.getElementById('confirmBookBtn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = `${icon('calendar')} Confirm Appointment`;
+  }
 });
 
 async function confirmBooking() {
@@ -299,11 +324,11 @@ async function confirmBooking() {
 
   if (!date) { errBox.textContent = 'Please select a date.'; errBox.classList.add('is-visible'); return; }
   if (!selectedDoctor) { errBox.textContent = 'No doctor selected.'; errBox.classList.add('is-visible'); return; }
+  if (!selectedDoctor.is_available) { errBox.textContent = "This doctor isn't currently accepting appointments."; errBox.classList.add('is-visible'); return; }
+  if (!selectedSlot) { errBox.textContent = 'Please select one of the available time slots.'; errBox.classList.add('is-visible'); return; }
 
   btn.disabled = true;
   btn.innerHTML = `${icon('clock')} Booking…`;
-
-  const apptTime = selectedSlot ? selectedSlot.start_time : '09:00:00';
 
   const payload = {
     doctor: selectedDoctor.id,
@@ -311,7 +336,7 @@ async function confirmBooking() {
     appointment_type: type,
     symptoms: notes || '',  // backend field is "symptoms"
     notes: notes || '',
-    appointment_time: apptTime,
+    appointment_time: selectedSlot.start_time,
   };
 
   try {

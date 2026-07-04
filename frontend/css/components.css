@@ -184,6 +184,27 @@
 @keyframes shimmer{ 0%{background-position:100% 50%;} 100%{background-position:0 50%;} }
 .skel-line{ height: 12px; border-radius: 6px; margin-bottom: 8px; }
 
+/* ---------- Availability toggle switch (doctor dashboard) ---------- */
+.avail-switch{ display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+.avail-switch input{ position:absolute; opacity:0; width:0; height:0; }
+.avail-switch__track{
+  width:40px; height:22px; border-radius:99px; background:var(--glass-border);
+  position:relative; transition: background .2s ease; flex-shrink:0;
+}
+.avail-switch__thumb{
+  position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition: transform .2s ease;
+}
+.avail-switch input:checked + .avail-switch__track{ background:var(--emerald); }
+.avail-switch input:checked + .avail-switch__track .avail-switch__thumb{ transform: translateX(18px); }
+.avail-switch input:focus-visible + .avail-switch__track{ outline:2px solid var(--emerald); outline-offset:2px; }
+.avail-switch__label{ font-size:12.5px; font-weight:700; color:var(--forest-deep); white-space:nowrap; }
+.avail-switch.is-disabled{ opacity:.6; pointer-events:none; }
+
+@media (max-width: 640px){
+  .avail-switch__label{ display:none; }
+}
+
 /* ---------- Toast ---------- */
 .toast{
   position: fixed; bottom: 24px; right: 24px;
@@ -459,16 +480,18 @@
   padding:18px;
   display:flex; flex-direction:column; gap:10px;
   transition: all .18s ease;
+  min-width: 0;
 }
 .record-card:hover{ border-color:var(--emerald); box-shadow:0 0 0 3px var(--emerald-glow); }
 .record-card__icon{
   width:40px; height:40px; border-radius:10px;
   display:flex; align-items:center; justify-content:center;
   background:var(--green-tint);
+  flex-shrink: 0;
 }
 .record-card__icon svg{ width:20px; height:20px; color:var(--emerald-hover); }
-.record-card__title{ font-size:14px; font-weight:800; color:var(--forest-deep); }
-.record-card__sub{ font-size:12.5px; color:var(--ink-soft); }
+.record-card__title{ font-size:14px; font-weight:800; color:var(--forest-deep); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.record-card__sub{ font-size:12.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .vitals-timeline{ display:flex; flex-direction:column; gap:2px; }
 .vt-row{

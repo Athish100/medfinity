@@ -16,6 +16,8 @@ const ICONS = {
   weight:   '<path d="M12 3a3 3 0 100 6 3 3 0 000-6z"/><path d="M20 21H4a1 1 0 01-1-1c0-4.4 3.6-8 8-8s8 3.6 8 8a1 1 0 01-1 1z"/>',
   eye:      '<path d="M1 12S4 4 12 4s11 8 11 8-3 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
   shield:   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  sparkle:  '<path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 15l.7 2.1L22 18l-2.3.9L19 21l-.7-2.1L16 18l2.3-.9L19 15z"/>',
+  x:        '<path d="M18 6L6 18M6 6l12 12"/>',
 };
 const icon = (name, attrs='') => `<svg ${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 
@@ -71,7 +73,20 @@ if (document.getElementById('app')) {
             ${icon('upload')}
             <p>Drag & drop or <strong style="color:var(--emerald-hover);cursor:pointer;" id="browseLabel">browse</strong> to upload</p>
             <span>PDF, JPG or PNG · max 10 MB</span>
-            <div style="display:flex;gap:10px;justify-content:center;margin-top:16px;">
+            <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:16px;flex-wrap:wrap;">
+              <select id="uploadRecordType" style="padding:8px 10px;border-radius:8px;border:1px solid var(--glass-border);font-size:12.5px;">
+                <option value="lab_report">Lab Report</option>
+                <option value="xray">X-Ray</option>
+                <option value="mri">MRI</option>
+                <option value="ct_scan">CT Scan</option>
+                <option value="prescription">Prescription</option>
+                <option value="discharge_summary">Discharge Summary</option>
+                <option value="vaccination">Vaccination Record</option>
+                <option value="other" selected>Other</option>
+              </select>
+              <input type="date" id="uploadRecordDate" style="padding:8px 10px;border-radius:8px;border:1px solid var(--glass-border);font-size:12.5px;">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;">
               <button class="btn btn--primary btn--sm" id="confirmUpload" style="display:none;">${icon('upload')} Upload</button>
               <button class="btn btn--ghost btn--sm" id="cancelUpload">Cancel</button>
             </div>
@@ -79,6 +94,27 @@ if (document.getElementById('app')) {
           </div>
 
           <div class="records-grid" id="docsGrid">${skeletonDocCards(4)}</div>
+        </section>
+
+        <!-- AI Document Tools: Prescription OCR + Report Summarizer -->
+        <section class="tile" style="padding:20px 24px;">
+          <div class="tile__head" style="margin-bottom:14px;">
+            <h3 style="display:flex;align-items:center;gap:8px;">${icon('sparkle','style="color:var(--emerald);width:18px;height:18px;"')} AI Document Tools</h3>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+            <button class="btn btn--ghost" id="openOcrTool" style="justify-content:flex-start;padding:16px;height:auto;text-align:left;">
+              <div>
+                <div style="font-weight:700;color:var(--forest-deep);margin-bottom:4px;">${icon('pill','style="width:14px;height:14px;display:inline;margin-right:6px;"')} Prescription OCR</div>
+                <div style="font-size:12px;color:var(--ink-soft);font-weight:500;">Upload a prescription photo — AI extracts medicines, dosage & duration.</div>
+              </div>
+            </button>
+            <button class="btn btn--ghost" id="openSummarizeTool" style="justify-content:flex-start;padding:16px;height:auto;text-align:left;">
+              <div>
+                <div style="font-weight:700;color:var(--forest-deep);margin-bottom:4px;">${icon('file','style="width:14px;height:14px;display:inline;margin-right:6px;"')} Report Summarizer</div>
+                <div style="font-size:12px;color:var(--ink-soft);font-weight:500;">Upload a lab report — AI translates medical jargon into plain language.</div>
+              </div>
+            </button>
+          </div>
         </section>
 
         <!-- Conditions & allergies -->
@@ -99,6 +135,18 @@ if (document.getElementById('app')) {
 
       </div>
     </main>
+
+    <!-- AI Tool Modal (shared by OCR + Summarizer) -->
+    <div class="modal-overlay" id="aiToolModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:20px;">
+      <div class="tile" style="background:#fff;width:100%;max-width:560px;max-height:85vh;overflow-y:auto;padding:28px;border-radius:var(--radius-lg);position:relative;">
+        <button id="closeAiToolModal" style="position:absolute;top:20px;right:20px;background:none;border:none;cursor:pointer;color:var(--ink-soft);">${icon('x','style="width:20px;height:20px;"')}</button>
+        <h3 id="aiToolTitle" style="margin-bottom:6px;font-size:19px;color:var(--forest-deep);"></h3>
+        <p id="aiToolSub" style="font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;"></p>
+        <input type="file" id="aiToolFile" accept=".jpg,.jpeg,.png" style="margin-bottom:14px;">
+        <button class="btn btn--primary btn--block" id="aiToolRun">${icon('sparkle','style="width:14px;height:14px;"')} Analyze</button>
+        <div id="aiToolResult" style="margin-top:18px;font-size:13.5px;color:var(--forest-deep);line-height:1.6;"></div>
+      </div>
+    </div>
   `;
 
   initPage();
@@ -112,6 +160,105 @@ function initPage() {
   loadDocuments();
   loadProfile();
   setupUpload();
+  setupAiTools();
+}
+
+/* ── AI Document Tools (Prescription OCR + Report Summarizer) ─── */
+let aiToolMode = null; // 'ocr' | 'summarize'
+
+function setupAiTools() {
+  const modal   = document.getElementById('aiToolModal');
+  const title   = document.getElementById('aiToolTitle');
+  const sub     = document.getElementById('aiToolSub');
+  const fileEl  = document.getElementById('aiToolFile');
+  const runBtn  = document.getElementById('aiToolRun');
+  const result  = document.getElementById('aiToolResult');
+
+  const openModal = (mode) => {
+    aiToolMode = mode;
+    fileEl.value = '';
+    result.innerHTML = '';
+    if (mode === 'ocr') {
+      title.textContent = 'Prescription OCR';
+      sub.textContent = 'Upload a clear photo of a prescription. AI will extract the medicines, dosage and duration.';
+    } else {
+      title.textContent = 'Report Summarizer';
+      sub.textContent = 'Upload a lab report or scan. AI will translate the medical jargon into plain language.';
+    }
+    modal.style.display = 'flex';
+  };
+  const closeModal = () => { modal.style.display = 'none'; aiToolMode = null; };
+
+  document.getElementById('openOcrTool').addEventListener('click', () => openModal('ocr'));
+  document.getElementById('openSummarizeTool').addEventListener('click', () => openModal('summarize'));
+  document.getElementById('closeAiToolModal').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  runBtn.addEventListener('click', async () => {
+    const file = fileEl.files[0];
+    if (!file) { showToast('Choose an image first.', 'error'); return; }
+
+    runBtn.disabled = true;
+    const originalLabel = runBtn.innerHTML;
+    runBtn.innerHTML = 'Analyzing…';
+    result.innerHTML = `<div style="text-align:center;padding:12px 0;color:var(--ink-soft);">${skeletonRows(2)}</div>`;
+
+    try {
+      if (aiToolMode === 'ocr') {
+        const data = await AiAPI.ocrPrescription(file);
+        renderOcrResult(data);
+      } else {
+        const data = await AiAPI.summarizeReportImage(file);
+        renderSummaryResult(data);
+      }
+    } catch (err) {
+      result.innerHTML = `<div style="color:var(--danger);">${escapeHtml(err.message || 'Something went wrong. Please try a clearer image.')}</div>`;
+    } finally {
+      runBtn.disabled = false;
+      runBtn.innerHTML = originalLabel;
+    }
+  });
+}
+
+function renderOcrResult(data) {
+  const result = document.getElementById('aiToolResult');
+  const meds = data.medicines || [];
+  const rows = meds.length
+    ? meds.map(m => `
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--glass-border);">
+          <div>
+            <div style="font-weight:700;">${escapeHtml(m.name || 'Unnamed medicine')}</div>
+            <div style="font-size:11.5px;color:var(--ink-soft);">${escapeHtml([m.frequency, m.duration].filter(Boolean).join(' · '))}</div>
+          </div>
+          <div style="font-size:12.5px;color:var(--emerald-hover);font-weight:700;white-space:nowrap;">${escapeHtml(m.dosage || '')}</div>
+        </div>`).join('')
+    : `<div style="color:var(--ink-soft);">No medicines could be confidently identified. Try a clearer, well-lit photo.</div>`;
+
+  result.innerHTML = `
+    ${data.patient_name || data.doctor_name ? `
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
+        ${data.doctor_name ? `Dr. ${escapeHtml(data.doctor_name)}` : ''} ${data.date ? `· ${escapeHtml(data.date)}` : ''}
+      </div>` : ''}
+    <div style="font-weight:700;margin-bottom:6px;">Extracted Medicines</div>
+    ${rows}
+    ${data.diagnosis ? `<div style="margin-top:12px;"><strong>Diagnosis:</strong> ${escapeHtml(data.diagnosis)}</div>` : ''}
+    ${data.special_instructions ? `<div style="margin-top:6px;"><strong>Instructions:</strong> ${escapeHtml(data.special_instructions)}</div>` : ''}
+  `;
+}
+
+function renderSummaryResult(data) {
+  const result = document.getElementById('aiToolResult');
+  const findings = data.key_findings || [];
+  const abnormal = data.abnormal_values || [];
+  const nextSteps = data.next_steps || [];
+  result.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;">Summary</div>
+    <p style="margin-bottom:12px;">${escapeHtml(data.summary || 'No summary available.')}</p>
+    ${findings.length ? `<div style="font-weight:700;margin-bottom:6px;">Key Findings</div><ul style="margin:0 0 12px 18px;">${findings.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : ''}
+    ${abnormal.length ? `<div style="font-weight:700;margin-bottom:6px;color:var(--danger);">Abnormal Values</div><ul style="margin:0 0 12px 18px;">${abnormal.map(f => `<li>${escapeHtml(typeof f === 'string' ? f : JSON.stringify(f))}</li>`).join('')}</ul>` : ''}
+    ${nextSteps.length ? `<div style="font-weight:700;margin-bottom:6px;">Next Steps</div><ul style="margin:0 0 12px 18px;">${nextSteps.map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : ''}
+    <div style="font-size:11px;color:var(--ink-soft);border-top:1px solid var(--glass-border);padding-top:10px;margin-top:6px;">${escapeHtml(data.disclaimer || 'AI-generated interpretation — always confirm with your doctor.')}</div>
+  `;
 }
 
 /* ── Vitals ─────────────────────────────────────────────── */
@@ -204,14 +351,44 @@ async function loadDocuments() {
       return;
     }
     grid.innerHTML = items.map(r => `
-      <div class="record-card">
+      <div class="record-card" data-record-id="${r.id}">
         <div class="record-card__icon">${icon('file')}</div>
-        <div class="record-card__title">${escapeHtml(r.title || r.record_type || 'Document')}</div>
-        <div class="record-card__sub">${formatDate(r.created_at || r.date)}</div>
-        ${r.file_url ? `<a class="btn btn--ghost btn--sm" href="${escapeHtml(r.file_url)}" target="_blank" style="align-self:flex-start;">View</a>` : ''}
+        <div class="record-card__title" title="${escapeHtml(r.title || r.record_type || 'Document')}">${escapeHtml(r.title || r.record_type || 'Document')}</div>
+        <div class="record-card__sub">${formatDate(r.created_at || r.record_date || r.date)}</div>
+        <div style="display:flex;gap:8px;align-self:flex-start;">
+          ${r.file ? `<a class="btn btn--ghost btn--sm" href="${escapeHtml(r.file)}" target="_blank" rel="noopener">${icon('eye','style="width:13px;height:13px;"')} View</a>` : ''}
+          <button class="btn btn--ghost btn--sm record-card__delete" data-record-id="${r.id}" title="Remove document" style="color:var(--danger);">${icon('x','style="width:12px;height:12px;"')} Remove</button>
+        </div>
       </div>`).join('');
-  } catch {
-    grid.innerHTML = `<div style="grid-column:1/-1;">${emptyState("Couldn't load documents", '', icon('file'))}</div>`;
+
+    grid.querySelectorAll('.record-card__delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteDocument(btn.dataset.recordId, btn));
+    });
+  } catch (err) {
+    console.error('loadDocuments failed:', err);
+    grid.innerHTML = `<div style="grid-column:1/-1;">${emptyState("Couldn't load documents", err?.message || 'Please refresh and try again.', icon('file'))}</div>`;
+  }
+}
+
+async function deleteDocument(id, btn) {
+  if (!confirm('Remove this document? This can\'t be undone.')) return;
+
+  const card = btn.closest('.record-card');
+  btn.disabled = true;
+  btn.textContent = 'Removing…';
+
+  try {
+    await HealthAPI.deleteRecord(id);
+    card.style.opacity = '0.4';
+    card.remove();
+    showToast('Document removed.', 'success');
+    // Re-render the empty state if that was the last document.
+    const grid = document.getElementById('docsGrid');
+    if (!grid.querySelector('.record-card')) loadDocuments();
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = `${icon('x','style="width:12px;height:12px;"')} Remove`;
+    showToast(err.message || "Couldn't remove that document.", 'error');
   }
 }
 
@@ -247,6 +424,9 @@ function setupUpload() {
   const confirm= document.getElementById('confirmUpload');
   const fname  = document.getElementById('uploadFileName');
 
+  const recordDateInput = document.getElementById('uploadRecordDate');
+  if (recordDateInput && !recordDateInput.value) recordDateInput.value = new Date().toISOString().slice(0, 10);
+
   btn.addEventListener('click', () => { zone.style.display = 'block'; btn.style.display = 'none'; });
   cancel.addEventListener('click', () => { zone.style.display = 'none'; btn.style.display = ''; input.value = ''; fname.textContent = ''; confirm.style.display = 'none'; });
   browse.addEventListener('click', () => input.click());
@@ -268,9 +448,14 @@ function setupUpload() {
   confirm.addEventListener('click', async () => {
     if (!input.files[0]) return;
     confirm.disabled = true; confirm.textContent = 'Uploading…';
+    const recordType = document.getElementById('uploadRecordType')?.value || 'other';
+    const recordDate = document.getElementById('uploadRecordDate')?.value || new Date().toISOString().slice(0, 10);
+
     const form = new FormData();
     form.append('file', input.files[0]);
     form.append('title', input.files[0].name);
+    form.append('record_type', recordType);
+    form.append('record_date', recordDate);
     try {
       await apiCall('/health-records/', { method: 'POST', body: form });
       showToast('Document uploaded!', 'success');

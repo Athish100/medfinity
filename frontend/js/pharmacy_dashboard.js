@@ -472,7 +472,7 @@ function checkOrderReminders(orders) {
       if (window.Notification && Notification.permission === 'granted') {
         new Notification('Pending Order Reminder', {
           body: `Order #${o.id} from ${o.patient_name || 'a patient'} has been waiting ${Math.round(ageMins)} min for confirmation.`,
-          icon: '/favicon.ico',
+          icon: '/assets/favicon.svg',
         });
       }
       showToast(`Reminder: Order #${o.id} is still pending — confirm or update it.`, 'default');

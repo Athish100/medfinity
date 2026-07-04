@@ -9,8 +9,15 @@ const ICONS = {
   user: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 7a4 4 0 110-8 4 4 0 010 8z"/>',
   check: '<path d="M20 6L9 17l-5-5"/>',
   save: '<path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
 };
 const icon = (name, attrs='') => `<svg ${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+
+/** Where "Close" should send the user back to. */
+function dashboardUrlFor(u) {
+  const type = u.user_type === 'pharmacist' ? 'pharmacy' : u.user_type === 'caregiver' ? 'patient' : u.user_type;
+  return `${type}_dashboard.html`;
+}
 
 let profileData = null;
 
@@ -24,7 +31,8 @@ if (document.getElementById('app')) {
         title: 'Account Settings',
         sub: 'View and update your personal info, credentials and practice details.',
         user,
-        hideSearch: user.user_type === 'doctor' || user.user_type === 'pharmacist'
+        hideSearch: true,
+        rightContent: `<button id="closeProfileBtn" class="btn btn--ghost" style="padding:11px 18px;" title="Close and return to dashboard">${icon('x', 'style="width:14px;height:14px;"')} Close</button>`
       })}
 
       <div class="bento bento--profile" style="gap: 24px; align-items: start;">
@@ -106,10 +114,6 @@ if (document.getElementById('app')) {
                   <input id="consultation_fee" type="number" min="0">
                 </div>
               </div>
-              <div class="field" style="flex-direction:row; align-items:center; gap:8px; margin-top:8px;">
-                <input type="checkbox" id="is_available" style="width:auto; cursor:pointer;">
-                <label for="is_available" style="cursor:pointer; margin-bottom:0;">Available for appointments</label>
-              </div>
             </div>
 
             <!-- Patient Specific Fields -->
@@ -184,6 +188,9 @@ if (document.getElementById('app')) {
 function initPage() {
   loadProfile();
   document.getElementById('profileForm').addEventListener('submit', handleProfileSubmit);
+  document.getElementById('closeProfileBtn').addEventListener('click', () => {
+    window.location.href = dashboardUrlFor(user);
+  });
 }
 
 async function loadProfile() {
@@ -212,7 +219,6 @@ async function loadProfile() {
       form.license_number.value   = profileData.license_number || '';
       form.experience_years.value = profileData.experience_years || 0;
       form.consultation_fee.value = parseInt(profileData.consultation_fee, 10) || 0;
-      form.is_available.checked   = profileData.is_available;
     } else if (userType === 'patient' || userType === 'caregiver') {
       if (dobContainer) dobContainer.style.display = 'flex';
       document.getElementById('patientFields').style.display = 'block';
@@ -300,7 +306,6 @@ async function handleProfileSubmit(e) {
     payload.license_number   = form.license_number.value.trim();
     payload.experience_years = parseInt(form.experience_years.value, 10) || 0;
     payload.consultation_fee = parseFloat(form.consultation_fee.value) || 0;
-    payload.is_available     = form.is_available.checked;
   } else if (userType === 'pharmacist') {
     payload.pharmacy_name    = form.pharmacy_name.value.trim();
     payload.pharmacy_license = form.pharmacy_license.value.trim();

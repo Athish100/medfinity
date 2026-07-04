@@ -28,7 +28,13 @@ if (document.getElementById('app')){
         title: `${greeting()}, Dr. ${lastName} 👋`,
         sub: "Here's your day at a glance — your patients are counting on you.",
         user,
-        hideSearch: true
+        hideSearch: true,
+        rightContent: `
+          <label class="avail-switch" id="availSwitchWrap" title="Toggle whether you're currently accepting new appointments">
+            <input type="checkbox" id="availabilitySwitch">
+            <span class="avail-switch__track"><span class="avail-switch__thumb"></span></span>
+            <span class="avail-switch__label" id="availabilitySwitchLabel">Available</span>
+          </label>`
       })}
 
       <div class="bento bento--dash" id="bento">
@@ -93,6 +99,7 @@ if (document.getElementById('app')){
   `;
 
   loadDashboard();
+  setupAvailabilitySwitch();
   if (activeTab === 'appointments') {
     setTimeout(() => {
       document.getElementById('apptTile')?.scrollIntoView({ behavior: 'smooth' });
@@ -101,6 +108,40 @@ if (document.getElementById('app')){
   document.getElementById('markAllRead').addEventListener('click', async (e) => {
     e.preventDefault();
     try { await NotificationsAPI.markAllRead(); loadNotifications(); } catch (err){ showToast(err.message, 'error'); }
+  });
+}
+
+function setAvailabilitySwitchLabel(isAvailable) {
+  const label = document.getElementById('availabilitySwitchLabel');
+  if (label) label.textContent = isAvailable ? 'Available' : 'Unavailable';
+}
+
+async function setupAvailabilitySwitch() {
+  const wrap = document.getElementById('availSwitchWrap');
+  const checkbox = document.getElementById('availabilitySwitch');
+  if (!checkbox) return;
+
+  try {
+    const profile = await UsersAPI.profile();
+    checkbox.checked = !!profile.is_available;
+    setAvailabilitySwitchLabel(checkbox.checked);
+  } catch {
+    setAvailabilitySwitchLabel(true);
+  }
+
+  checkbox.addEventListener('change', async () => {
+    const next = checkbox.checked;
+    wrap.classList.add('is-disabled');
+    try {
+      await UsersAPI.updateProfile({ is_available: next });
+      setAvailabilitySwitchLabel(next);
+      showToast(next ? "You're now accepting appointments." : "You're now marked unavailable.", 'success');
+    } catch (err) {
+      checkbox.checked = !next;
+      showToast(err.message || 'Could not update availability.', 'error');
+    } finally {
+      wrap.classList.remove('is-disabled');
+    }
   });
 }
 
@@ -135,7 +176,7 @@ function checkUpcomingReminders(items) {
       if (window.Notification && Notification.permission === 'granted') {
         new Notification(`Upcoming Appointment Reminder`, {
           body: `Your appointment with ${a.patient_name || 'Patient'} is scheduled at ${formatTime(a.appointment_time)} (${a.appointment_type === 'video' ? 'Video' : 'In-person'}).`,
-          icon: '/favicon.ico'
+          icon: '/assets/favicon.svg'
         });
       }
       

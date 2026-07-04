@@ -201,7 +201,15 @@ async function sendMessage() {
       const data = await AiAPI.checkSymptoms({ symptoms: text });
       response = data.response || data.analysis || data.message || JSON.stringify(data);
     } else if (activeMode === 'recommend') {
-      const data = await AiAPI.recommendDoctor({ symptoms: text });
+      const data = await AiAPI.rankDoctors({ symptoms: text });
+      if (data.doctors && data.doctors.length) {
+        removeTyping(typingId);
+        appendDoctorCards(data.doctors, mode);
+        history[activeMode].push({ role: 'ai', text: '[doctor recommendations shown above]' });
+        sendBtn.disabled = false;
+        input.focus();
+        return;
+      }
       response = data.response || data.recommendation || data.message || JSON.stringify(data);
     } else {
       const data = await AiAPI.chat(text);
@@ -279,6 +287,30 @@ function appendTyping() {
 
 function removeTyping(id) {
   document.getElementById(id)?.remove();
+}
+
+function appendDoctorCards(doctors, mode) {
+  const msgs = document.getElementById('chatMessages');
+  const el = document.createElement('div');
+  el.className = 'msg msg--ai';
+  const cards = doctors.slice(0, 5).map(d => `
+    <div style="background:#fff;border:1px solid var(--glass-border);border-radius:12px;padding:12px 14px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div>
+        <div style="font-weight:700;color:var(--forest-deep);font-size:13.5px;">${escapeHtml(d.doctor_name || d.name || 'Doctor')}</div>
+        <div style="font-size:12px;color:var(--emerald-hover);font-weight:600;">${escapeHtml(d.specialty || '')}</div>
+        ${d.reasoning ? `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;max-width:320px;">${escapeHtml(d.reasoning)}</div>` : ''}
+      </div>
+      ${d.doctor_id ? `<a class="btn btn--primary btn--sm" href="appointments.html?doctor=${d.doctor_id}" style="white-space:nowrap;">Book</a>` : ''}
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="msg__avatar" style="background:${mode?.col || 'var(--emerald)'};color:white;font-size:11px;">AI</div>
+    <div>
+      <div class="msg__bubble">Here are the doctors that best match what you described:${cards}</div>
+      <div class="msg__time">${formatTime12(new Date())}</div>
+    </div>`;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
 }
 
 /* ── Helpers ─────────────────────────────────────────────── */

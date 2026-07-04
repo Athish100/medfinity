@@ -53,7 +53,19 @@
 }
 
 *{ box-sizing: border-box; }
-html,body{ margin:0; padding:0; }
+html,body{ 
+  margin:0;
+  padding:0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
 body{
   background: var(--bg-page);
   color: var(--ink);
@@ -380,15 +392,6 @@ button{ font-family: inherit; }
   padding: 44px 40px;
   box-shadow: var(--shadow-lift);
 }
-.auth__mark{
-  width: 48px; height: 48px; border-radius: 12px;
-  background: linear-gradient(135deg, var(--emerald) 0%, var(--emerald-hover) 100%);
-  color: var(--white);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 28px;
-  box-shadow: 0 4px 14px rgba(29, 107, 76, 0.2);
-}
-.auth__mark svg{ width: 26px; height: 26px; }
 .auth__card h1{ font-size: 28px; margin-bottom: 8px; font-weight: 800; }
 .auth__card p.sub{ color: var(--ink-soft); font-size: 14.5px; margin: 0 0 32px; font-weight: 500; }
 

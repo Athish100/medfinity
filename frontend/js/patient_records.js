@@ -14,6 +14,8 @@ const ICONS = {
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  file: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>',
+  eye: '<path d="M1 12S4 4 12 4s11 8 11 8-3 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
 };
 const icon = (name, attrs='') => `<svg ${attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
 
@@ -21,6 +23,7 @@ let patientsList = [];
 let selectedPatient = null;
 let patientAppointments = [];
 let patientPrescriptions = [];
+let patientDocuments = [];
 
 if (document.getElementById('app')) {
   document.getElementById('app').innerHTML = `
@@ -168,12 +171,22 @@ async function selectPatient(p) {
   detail.innerHTML = skeletonRows(3);
 
   try {
-    // Fetch patient appointments and prescriptions
+    // Fetch patient appointments, prescriptions, and uploaded documents
     const appts = await AppointmentsAPI.forPatient(p.id);
     const rxs = await PrescriptionsAPI.forPatient(p.id);
-    
+
     patientAppointments = appts.results || appts;
     patientPrescriptions = rxs.results || rxs;
+
+    // Documents are a nice-to-have — don't let a failure here block the
+    // rest of the patient record from rendering.
+    try {
+      const docs = await HealthAPI.forPatient(p.id);
+      patientDocuments = docs.results || docs;
+    } catch (err) {
+      console.error('Failed to load patient documents:', err);
+      patientDocuments = [];
+    }
 
     renderPatientDetail(p);
   } catch (err) {
@@ -251,6 +264,20 @@ function renderPatientDetail(p) {
       </table>
     </div>` : `<div style="color:var(--ink-soft);font-size:13px;padding:12px 0;">No appointments found.</div>`;
 
+  // Uploaded documents (read-only for doctors)
+  const docsHtml = patientDocuments.length ? `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:12px;">
+      ${patientDocuments.map(d => `
+        <div style="background:var(--bg-canvas);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${icon('file', 'style="width:16px;height:16px;color:var(--emerald-hover);flex-shrink:0;"')}
+            <span style="font-size:12.5px;font-weight:700;color:var(--forest-deep);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(d.title || d.record_type || 'Document')}</span>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);">${escapeHtml((d.record_type || '').replace(/_/g, ' '))} · ${formatDate(d.record_date || d.created_at)}</div>
+          ${d.file ? `<a class="btn btn--ghost btn--sm" href="${escapeHtml(d.file)}" target="_blank" rel="noopener" style="align-self:flex-start;">${icon('eye', 'style="width:12px;height:12px;"')} View</a>` : ''}
+        </div>`).join('')}
+    </div>` : `<div style="color:var(--ink-soft);font-size:13px;padding:12px 0;">No documents uploaded by this patient yet.</div>`;
+
   detail.innerHTML = `
     <div style="border-bottom:1px solid var(--glass-border); padding-bottom:16px;">
       <h2 class="display" style="font-size:24px; color:var(--forest-deep);">${escapeHtml(p.full_name)}</h2>
@@ -276,8 +303,13 @@ function renderPatientDetail(p) {
     </div>
 
     <div style="margin-top:24px; border-top:1px solid var(--glass-border); padding-top:20px;">
-      <h3 style="font-size:16px; color:var(--forest-deep); font-weight:700;">Appointment History</h3>
+      <h3 style="font-size:16px; color:var(--forest-deep); font-weight:700; display:flex;align-items:center;gap:8px;">${icon('calendar','style="width:16px;height:16px;"')} Appointment History</h3>
       ${apptsTable}
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid var(--glass-border); padding-top:20px;">
+      <h3 style="font-size:16px; color:var(--forest-deep); font-weight:700; display:flex;align-items:center;gap:8px;">${icon('file','style="width:16px;height:16px;"')} Uploaded Documents</h3>
+      ${docsHtml}
     </div>
   `;
 }

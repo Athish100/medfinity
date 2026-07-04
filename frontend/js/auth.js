@@ -79,7 +79,7 @@ if (registerForm){
     try {
       await Auth.register(payload);
       showToast('Account created — log in to continue.', 'success');
-      window.location.href = '/pages/login.html';
+      window.location.href = '/login.html';
     } catch (err){
       errorBox.textContent = err.message || 'Something went wrong creating your account.';
       errorBox.classList.add('is-visible');

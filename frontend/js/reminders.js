@@ -243,7 +243,7 @@ function checkDueReminders() {
       if (window.Notification && Notification.permission === 'granted') {
         new Notification('Medicine Reminder', {
           body: `Time to take ${r.medicine_name} (${r.dosage}).`,
-          icon: '/favicon.ico',
+          icon: '/assets/favicon.svg',
         });
       }
       showToast(`💊 Time to take ${r.medicine_name} (${r.dosage})`, 'default');

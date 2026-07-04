@@ -35,8 +35,18 @@
   },
 
   {
+    "src": "^/assets/(.*)",
+    "dest": "/frontend/assets/$1"
+  },
+
+  {
     "src": "^/$",
     "dest": "/frontend/pages/login.html"
+  },
+
+  {
+    "src": "^/pages/(.*\\.html)",
+    "dest": "/frontend/pages/$1"
   },
 
   {

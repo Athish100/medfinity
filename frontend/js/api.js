@@ -58,7 +58,7 @@ async function apiCall(endpoint, options = {}, _retry = true){
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiCall(endpoint, options, false);
     clearSession();
-    window.location.href = '/pages/login.html';
+    window.location.href = '/login.html';
     return;
   }
 
@@ -109,6 +109,8 @@ const UsersAPI = {
   doctorSearch:       (q)         => apiCall(`/users/doctors/?search=${encodeURIComponent(q)}`),
   doctor:             (id)        => apiCall(`/users/doctors/${id}/`),
   doctorAvailability: (id)        => apiCall(`/users/doctors/${id}/availability/`),
+  createAvailability: (doctorId, payload) => apiCall(`/users/doctors/${doctorId}/availability/`, { method: 'POST', body: JSON.stringify(payload) }),
+  deleteAvailability: (id)        => apiCall(`/users/availability/${id}/`, { method: 'DELETE' }),
   pharmacists:        (params='') => apiCall(`/users/pharmacists/${params}`),
   nearbyPharmacists:  (lat, lng)  => apiCall(`/users/pharmacists/nearby/?lat=${lat}&lng=${lng}`),
 };
@@ -132,8 +134,12 @@ const AppointmentsAPI = {
 const HealthAPI = {
   records:      ()   => apiCall('/health-records/'),
   record:       (id) => apiCall(`/health-records/${id}/`),
+  deleteRecord: (id) => apiCall(`/health-records/${id}/`, { method: 'DELETE' }),
   latestVitals: ()   => apiCall('/health-records/vitals/latest/'),
   vitals:       ()   => apiCall('/health-records/vitals/'),
+  // Doctor: read-only view of a specific patient's uploaded documents
+  // (only works for patients the doctor has an appointment with).
+  forPatient:   (patientId) => apiCall(`/health-records/patient/${patientId}/`),
 };
 
 /* ---------- Prescriptions ---------- */
@@ -191,4 +197,8 @@ const AiAPI = {
   chat:           (message) => apiCall('/ai/chat/', { method: 'POST', body: JSON.stringify({ message }) }),
   recommendDoctor:(payload) => apiCall('/ai/recommend-doctor/', { method: 'POST', body: JSON.stringify(payload) }),
   rankDoctors:    (payload) => apiCall('/ai/rank-doctors/', { method: 'POST', body: JSON.stringify(payload) }),
+  ocrPrescription:(imageFile) => { const f = new FormData(); f.append('image', imageFile); return apiCall('/ai/ocr-prescription/', { method: 'POST', body: f }); },
+  summarizeReportImage: (imageFile, reportType='general') => { const f = new FormData(); f.append('image', imageFile); f.append('report_type', reportType); return apiCall('/ai/summarize-report-image/', { method: 'POST', body: f }); },
+  summarizeReport:(reportText, reportType='general') => apiCall('/ai/summarize-report/', { method: 'POST', body: JSON.stringify({ report_text: reportText, report_type: reportType }) }),
+  followUpQuestions:(symptoms) => apiCall('/ai/follow-up-questions/', { method: 'POST', body: JSON.stringify({ symptoms }) }),
 };

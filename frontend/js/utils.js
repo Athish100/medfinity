@@ -5,7 +5,7 @@
 function requireAuth(allowedTypes){
   const user = getCurrentUser();
   if (!getAccessToken() || !user){
-    window.location.href = '/pages/login.html';
+    window.location.href = '/login.html';
     return null;
   }
   if (allowedTypes && !allowedTypes.includes(user.user_type)){
