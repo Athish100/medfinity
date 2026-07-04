@@ -1,6 +1,8 @@
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Appointment, AppointmentSlot
 from apps.users.serializers import DoctorListSerializer
+from apps.users.models import DoctorAvailability
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,14 +27,53 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
 
 class AppointmentCreateSerializer(serializers.ModelSerializer):
-    # appointment_time defaults to 09:00 if not provided
-    appointment_time = serializers.TimeField(default='09:00:00', required=False)
+    appointment_time = serializers.TimeField(required=True)
 
     class Meta:
         model = Appointment
         fields = ['id', 'doctor', 'appointment_date', 'appointment_time', 'appointment_type',
                   'symptoms', 'notes', 'status', 'created_at']
         read_only_fields = ['id', 'status', 'created_at']
+
+    def validate(self, data):
+        doctor = data.get('doctor')
+        appt_date = data.get('appointment_date')
+        appt_time = data.get('appointment_time')
+
+        if doctor is None or getattr(doctor, 'user_type', None) != 'doctor':
+            raise serializers.ValidationError({'doctor': 'Please select a valid doctor.'})
+
+        if not doctor.is_available:
+            raise serializers.ValidationError({'doctor': 'This doctor is not currently accepting appointments.'})
+
+        if not appt_date:
+            raise serializers.ValidationError({'appointment_date': 'Please select a date.'})
+        if appt_date < timezone.localdate():
+            raise serializers.ValidationError({'appointment_date': 'You cannot book an appointment in the past.'})
+
+        if not appt_time:
+            raise serializers.ValidationError({'appointment_time': 'Please select an available time slot.'})
+
+        weekday_name = appt_date.strftime('%A').lower()
+        slot_match = DoctorAvailability.objects.filter(
+            doctor=doctor, day=weekday_name, is_available=True,
+            start_time__lte=appt_time, end_time__gt=appt_time,
+        ).exists()
+        if not slot_match:
+            raise serializers.ValidationError({
+                'appointment_time': "This doctor isn't available at the selected date/time. Please choose one of their listed slots."
+            })
+
+        clash = Appointment.objects.filter(
+            doctor=doctor, appointment_date=appt_date, appointment_time=appt_time,
+            status__in=['scheduled', 'confirmed', 'in_progress'],
+        ).exists()
+        if clash:
+            raise serializers.ValidationError({
+                'appointment_time': 'That slot was just booked by someone else. Please choose another time.'
+            })
+
+        return data
 
     def create(self, validated_data):
         validated_data['patient'] = self.context['request'].user
