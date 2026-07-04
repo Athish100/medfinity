@@ -105,7 +105,6 @@ ASGI_APPLICATION = 'config.asgi.application'
 import urllib.parse
 
 if os.environ.get('DATABASE_URL'):
-    import urllib.parse
     _db_url = urllib.parse.urlparse(os.environ['DATABASE_URL'])
     _db_params = urllib.parse.parse_qs(_db_url.query)
     DATABASES = {
@@ -121,28 +120,34 @@ if os.environ.get('DATABASE_URL'):
             },
         }
     }
+elif os.environ.get('DB_HOST'):
+    # Fallback used when the individual DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT
+    # vars from .env.example are set instead of a single DATABASE_URL. Without this
+    # branch those vars were silently ignored and the app fell through to SQLite —
+    # which is fine locally, but on a serverless host (e.g. Vercel) the filesystem
+    # outside /tmp is read-only/ephemeral, so data would appear to "reset" between
+    # requests. Set either DATABASE_URL or these DB_* vars in production.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'medfinity'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
 else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': '/tmp/db.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
 ]
-# For PostgreSQL (uncomment when ready):
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.getenv('DB_NAME', 'medfinity'),
-#         'USER': os.getenv('DB_USER', 'postgres'),
-#         'PASSWORD': os.getenv('DB_PASSWORD', 'password'),
-#         'HOST': os.getenv('DB_HOST', 'localhost'),
-#         'PORT': os.getenv('DB_PORT', '5432'),
-#     }
-# }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
