@@ -69,7 +69,7 @@ class OCRService:
             }
 
     def extract_with_gemini(self, image_path):
-        """Use Gemini for advanced prescription parsing."""
+        """Use Gemini for advanced prescription parsing (path-based, kept for compatibility)."""
         prompt = """Analyze this prescription image and extract the following information in a structured format:
         - Patient name
         - Doctor name
@@ -81,6 +81,67 @@ class OCRService:
         Return as JSON."""
 
         return self.gemini.analyze_image(image_path, prompt)
+
+    def extract_with_gemini_bytes(self, image_bytes, mime_type='image/jpeg'):
+        """
+        Extract prescription data using Gemini's vision model, directly from
+        in-memory bytes. This is the primary extraction path in production:
+        Tesseract's binary isn't available on serverless hosts (e.g. Vercel),
+        so `pytesseract`-based extraction only works where the system
+        `tesseract` executable is installed (e.g. local dev with it on PATH).
+        Gemini vision works anywhere the API key is configured.
+        """
+        prompt = """Analyze this prescription image carefully and extract the following information.
+        If a field isn't present or legible, use an empty string / empty list rather than guessing."""
+
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "patient_name": {"type": "string"},
+                "doctor_name": {"type": "string"},
+                "date": {"type": "string"},
+                "diagnosis": {"type": "string"},
+                "special_instructions": {"type": "string"},
+                "medicines": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "dosage": {"type": "string"},
+                            "frequency": {"type": "string"},
+                            "duration": {"type": "string"},
+                        }
+                    }
+                }
+            }
+        }
+
+        result = self.gemini.analyze_image(image_bytes, prompt, mime_type=mime_type, response_schema=response_schema)
+        if not result.get('success'):
+            return {'text': result.get('text', 'OCR failed.'), 'confidence': 0.0, 'medicines': [], 'word_count': 0}
+
+        import json
+        try:
+            parsed = json.loads(result['text'])
+        except (ValueError, TypeError):
+            return {'text': result['text'], 'confidence': 40.0, 'medicines': [], 'word_count': len(result['text'].split())}
+
+        medicines = parsed.get('medicines', [])
+        text_parts = [f"Patient: {parsed.get('patient_name','')}", f"Doctor: {parsed.get('doctor_name','')}",
+                      f"Date: {parsed.get('date','')}", f"Diagnosis: {parsed.get('diagnosis','')}"]
+        text = "\n".join([p for p in text_parts if p.split(': ', 1)[-1]])
+        return {
+            'text': text,
+            'confidence': 85.0 if medicines else 50.0,
+            'medicines': medicines,
+            'word_count': len(text.split()),
+            'patient_name': parsed.get('patient_name', ''),
+            'doctor_name': parsed.get('doctor_name', ''),
+            'date': parsed.get('date', ''),
+            'diagnosis': parsed.get('diagnosis', ''),
+            'special_instructions': parsed.get('special_instructions', ''),
+        }
 
     def _parse_medicines(self, text):
         """Parse medicine names and dosages from OCR text."""

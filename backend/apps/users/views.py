@@ -1,4 +1,4 @@
-from rest_framework import generics, status, filters
+from rest_framework import generics, status, filters, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -59,10 +59,29 @@ class DoctorAvailabilityView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         doctor_id = self.kwargs.get('doctor_id')
-        return DoctorAvailability.objects.filter(doctor_id=doctor_id, is_available=True)
+        return DoctorAvailability.objects.filter(doctor_id=doctor_id, is_available=True).order_by('day', 'start_time')
+
+    def create(self, request, *args, **kwargs):
+        if request.user.user_type != 'doctor':
+            return Response({'error': 'Only doctors can set availability.'}, status=403)
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save(doctor=self.request.user)
+        from django.db import IntegrityError
+        try:
+            serializer.save(doctor=self.request.user)
+        except IntegrityError:
+            raise serializers.ValidationError({'start_time': 'You already have a slot for this day and start time.'})
+
+
+class AvailabilityDetailView(generics.DestroyAPIView):
+    serializer_class = DoctorAvailabilitySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Scoped to the logged-in doctor only — you can't delete another
+        # doctor's availability slot.
+        return DoctorAvailability.objects.filter(doctor=self.request.user)
 
 
 @api_view(['GET'])

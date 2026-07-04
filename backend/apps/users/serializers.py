@@ -53,6 +53,20 @@ class PharmacistListSerializer(serializers.ModelSerializer):
 
 
 class DoctorAvailabilitySerializer(serializers.ModelSerializer):
+    day_label = serializers.CharField(source='get_day_display', read_only=True)
+
     class Meta:
         model = DoctorAvailability
         fields = '__all__'
+        # 'doctor' is a required FK with no blank=True; the view always sets
+        # it from request.user in perform_create(), so it must be read-only
+        # here too — otherwise POSTing a new slot 400s on "doctor: This
+        # field is required." before perform_create() is ever reached.
+        read_only_fields = ['doctor', 'is_available']
+
+    def validate(self, data):
+        start = data.get('start_time')
+        end = data.get('end_time')
+        if start and end and end <= start:
+            raise serializers.ValidationError({'end_time': 'End time must be after start time.'})
+        return data

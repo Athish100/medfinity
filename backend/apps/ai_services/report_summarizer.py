@@ -81,18 +81,50 @@ class ReportSummarizer:
             system_instruction=self.SYSTEM_PROMPT
         )
 
-    def summarize_from_image(self, image_path, report_type='general'):
-        """Summarize a medical report from an image."""
+    def summarize_from_image(self, image_bytes, report_type='general', mime_type='image/jpeg'):
+        """
+        Summarize a medical report from an image.
+
+        `image_bytes` is the raw image content (read directly from the
+        uploaded file) — no disk/storage access needed.
+        """
         prompt = f"""This is a {report_type} medical report image. Please:
         1. Extract all text from the image
         2. Summarize it in simple language
         3. Explain any medical terms
         4. Highlight any abnormal values
-        5. Suggest next steps
+        5. Suggest next steps"""
 
-        Return as JSON with keys: extracted_text, summary, key_findings, abnormal_values, next_steps, disclaimer"""
+        response_schema = {
+            "type": "object",
+            "properties": {
+                "extracted_text": {"type": "string"},
+                "summary": {"type": "string"},
+                "key_findings": {"type": "array", "items": {"type": "string"}},
+                "abnormal_values": {"type": "array", "items": {"type": "string"}},
+                "next_steps": {"type": "array", "items": {"type": "string"}},
+                "disclaimer": {"type": "string"}
+            }
+        }
 
-        return self.gemini.analyze_image(image_path, prompt)
+        result = self.gemini.analyze_image(image_bytes, prompt, mime_type=mime_type, response_schema=response_schema)
+        if result.get('success'):
+            import json
+            try:
+                parsed = json.loads(result['text'])
+                parsed['success'] = True
+                return parsed
+            except (ValueError, TypeError):
+                # Non-JSON fallback text (e.g. mock/quota fallback) — still return it usefully.
+                return {
+                    'success': True,
+                    'summary': result['text'],
+                    'key_findings': [],
+                    'abnormal_values': [],
+                    'next_steps': [],
+                    'disclaimer': 'AI-generated interpretation — always confirm with your doctor.'
+                }
+        return result
 
     def compare_reports(self, old_report, new_report):
         """Compare two reports and highlight changes."""

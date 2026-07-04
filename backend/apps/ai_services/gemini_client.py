@@ -185,8 +185,20 @@ class GeminiClient:
                 'error': str(e)
             }
 
-    def analyze_image(self, image_path, prompt):
-        """Analyze an image with Gemini (multimodal)."""
+    def analyze_image(self, image_source, prompt, mime_type='image/jpeg', response_schema=None):
+        """
+        Analyze an image with Gemini (multimodal).
+
+        `image_source` can be either a filesystem path (str/Path) OR raw bytes.
+        Accepting bytes lets callers pass an in-memory uploaded file directly,
+        without needing a writable local filesystem or a storage backend that
+        exposes a `.location` attribute (e.g. Cloudinary storage doesn't) —
+        both of which break on serverless hosts like Vercel.
+
+        If `response_schema` is provided, the response is constrained to that
+        JSON schema (same mechanism as generate_structured) so callers get
+        reliably-parseable structured output instead of free-form prose.
+        """
         if self.is_mock:
             return {
                 'text': "Based on the image analysis, this appears to be a standard medical report. Please review the details with a medical practitioner for a thorough interpretation.",
@@ -194,8 +206,18 @@ class GeminiClient:
             }
 
         try:
-            with open(image_path, 'rb') as f:
-                image_data = f.read()
+            if isinstance(image_source, (bytes, bytearray)):
+                image_data = bytes(image_source)
+            else:
+                with open(image_source, 'rb') as f:
+                    image_data = f.read()
+
+            config = None
+            if response_schema:
+                config = types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    response_schema=response_schema,
+                )
 
             response = self.client.models.generate_content(
                 model=self.model,
@@ -204,10 +226,11 @@ class GeminiClient:
                         role='user',
                         parts=[
                             types.Part(text=prompt),
-                            types.Part(inline_data=types.Blob(data=image_data, mime_type='image/jpeg'))
+                            types.Part(inline_data=types.Blob(data=image_data, mime_type=mime_type))
                         ]
                     )
-                ]
+                ],
+                config=config
             )
             return {
                 'text': response.text,
